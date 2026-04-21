@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "twitterlike-microservices"
+resolve_s3 = true
+s3_prefix = "twitterlike-microservices"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+  "Auth0Issuer=https://YOUR-DOMAIN.auth0.com/",
+  "Auth0Audience=https://twitterlike-api",
+  "CorsAllowedOrigin=http://YOUR-S3-WEBSITE-OR-CLOUDFRONT-DOMAIN"
+]

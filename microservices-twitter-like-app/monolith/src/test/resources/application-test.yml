@@ -1,0 +1,14 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://test-issuer.example.com/
+          jwk-set-uri: https://test-issuer.example.com/.well-known/jwks.json
+
+auth0:
+  audience: https://twitterlike-api
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173

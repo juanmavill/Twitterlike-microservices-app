@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Twitter-like microservices on AWS Lambda secured with Auth0
+
+Parameters:
+  Auth0Issuer:
+    Type: String
+    Description: Auth0 issuer URL (for example https://YOUR-DOMAIN.auth0.com/)
+  Auth0Audience:
+    Type: String
+    Description: Auth0 API audience used by backend clients
+    Default: https://twitterlike-api
+  CorsAllowedOrigin:
+    Type: String
+    Description: Allowed origin for browser calls
+    Default: '*'
+
+Globals:
+  Function:
+    Runtime: java21
+    Timeout: 20
+    MemorySize: 1024
+    Tracing: Active
+
+Resources:
+  TwitterApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref CorsAllowedOrigin
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+      Auth:
+        Authorizers:
+          Auth0Authorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Ref Auth0Issuer
+              audience:
+                - !Ref Auth0Audience
+
+  PostsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  PostsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: maven
+    Properties:
+      CodeUri: ../../microservices/posts-service
+      Handler: com.example.posts.PostsHandler::handleRequest
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref PostsTable
+          CORS_ALLOWED_ORIGIN: !Ref CorsAllowedOrigin
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PostsTable
+      Events:
+        GetPosts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TwitterApi
+            Path: /api/posts
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        CreatePost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TwitterApi
+            Path: /api/posts
+            Method: POST
+            Auth:
+              Authorizer: Auth0Authorizer
+              AuthorizationScopes:
+                - write:posts
+
+  StreamFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: maven
+    Properties:
+      CodeUri: ../../microservices/stream-service
+      Handler: com.example.stream.StreamHandler::handleRequest
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref PostsTable
+          CORS_ALLOWED_ORIGIN: !Ref CorsAllowedOrigin
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref PostsTable
+      Events:
+        GetStream:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TwitterApi
+            Path: /api/stream
+            Method: GET
+            Auth:
+              Authorizer: NONE
+
+  UserFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: maven
+    Properties:
+      CodeUri: ../../microservices/user-service
+      Handler: com.example.user.UserHandler::handleRequest
+      Environment:
+        Variables:
+          CORS_ALLOWED_ORIGIN: !Ref CorsAllowedOrigin
+      Events:
+        GetMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TwitterApi
+            Path: /api/me
+            Method: GET
+            Auth:
+              Authorizer: Auth0Authorizer
+              AuthorizationScopes:
+                - read:profile
+
+Outputs:
+  ApiBaseUrl:
+    Description: Base URL for the secured microservices API
+    Value: !Sub https://${TwitterApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+
+  PostsTableName:
+    Description: DynamoDB table that stores posts
+    Value: !Ref PostsTable
