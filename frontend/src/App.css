@@ -12,6 +12,36 @@
   --panel-border: rgba(0, 48, 73, 0.14);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-0: #10151b;
+    --ink-0: #e6edf3;
+    --ink-1: #9fb0c0;
+    --accent-0: #7cc4e0;
+    --panel: rgba(23, 31, 40, 0.78);
+    --panel-border: rgba(124, 196, 224, 0.18);
+    --danger: #ff8a8a;
+  }
+
+  body {
+    background: radial-gradient(circle at 15% 20%, #14342f, transparent 34%),
+      radial-gradient(circle at 90% 12%, #2a2413, transparent 32%),
+      linear-gradient(130deg, #0d1117, var(--bg-0));
+  }
+
+  .composer textarea,
+  .identity-card,
+  .post-item {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink-0);
+  }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--accent-0);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -160,6 +190,25 @@ h1 {
   color: var(--ink-1);
 }
 
+.identity-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.6rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.identity-list dt {
+  font-weight: 700;
+  color: var(--ink-0);
+}
+
+.identity-list dd {
+  margin: 0;
+  color: var(--ink-1);
+  overflow-wrap: anywhere;
+}
+
 .feed-header {
   display: flex;
   align-items: center;
@@ -220,7 +269,8 @@ h1 {
 .btn {
   border: none;
   border-radius: 999px;
-  padding: 0.62rem 1rem;
+  padding: 0.62rem 1.1rem;
+  min-height: 44px;
   cursor: pointer;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
@@ -228,8 +278,19 @@ h1 {
 }
 
 .btn:disabled {
-  cursor: wait;
-  opacity: 0.75;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn:disabled:hover {
+  transform: none;
+}
+
+/* Un contorno visible al navegar con teclado; el raton no lo dispara. */
+.btn:focus-visible,
+.composer textarea:focus-visible {
+  outline: 3px solid var(--accent-1);
+  outline-offset: 2px;
 }
 
 .btn:hover {
@@ -317,5 +378,41 @@ h1 {
 
   .app-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Las formas de fondo animan en bucle; quien pide menos movimiento no deberia
+   verlas moverse, y las entradas deben aparecer sin desplazamiento. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .btn:hover {
+    transform: none;
+  }
+}
+
+/* Movil: una sola columna ya se cubre arriba; aqui se ajusta el respiro. */
+@media (max-width: 560px) {
+  .page-shell {
+    padding: 0.75rem;
+  }
+
+  .panel {
+    padding: 1rem;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  .composer-footer {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
