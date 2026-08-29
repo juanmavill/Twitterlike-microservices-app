@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  monolith:
+    name: Monolith
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Verify monolith
+        working-directory: monolith
+        run: mvn -B verify
+
+  lambdas:
+    # Cada Lambda se despliega por separado, asi que tambien se prueba por
+    # separado. fail-fast desactivado para ver todas las que fallen, no solo la
+    # primera.
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [posts-service, stream-service, user-service]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Verify ${{ matrix.service }}
+        working-directory: microservices/${{ matrix.service }}
+        run: mvn -B verify
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Test
+        working-directory: frontend
+        run: npm test
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  infrastructure:
+    name: SAM template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate CloudFormation/SAM syntax
+        run: |
+          python -m pip install --quiet cfn-lint
+          # Solo se valida la sintaxis de la plantilla; desplegar exigiria
+          # credenciales de AWS que no viven en el repositorio.
+          cfn-lint infra/sam/template.yaml --ignore-checks W
