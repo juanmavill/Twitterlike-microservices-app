@@ -12,36 +12,6 @@
   --panel-border: rgba(0, 48, 73, 0.14);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-0: #10151b;
-    --ink-0: #e6edf3;
-    --ink-1: #9fb0c0;
-    --accent-0: #7cc4e0;
-    --panel: rgba(23, 31, 40, 0.78);
-    --panel-border: rgba(124, 196, 224, 0.18);
-    --danger: #ff8a8a;
-  }
-
-  body {
-    background: radial-gradient(circle at 15% 20%, #14342f, transparent 34%),
-      radial-gradient(circle at 90% 12%, #2a2413, transparent 32%),
-      linear-gradient(130deg, #0d1117, var(--bg-0));
-  }
-
-  .composer textarea,
-  .identity-card,
-  .post-item {
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--ink-0);
-  }
-
-  .btn-ghost {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--accent-0);
-  }
-}
-
 * {
   box-sizing: border-box;
 }
@@ -414,5 +384,35 @@ h1 {
   .composer-footer {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-0: #10151b;
+    --ink-0: #e6edf3;
+    --ink-1: #9fb0c0;
+    --accent-0: #7cc4e0;
+    --panel: rgba(23, 31, 40, 0.78);
+    --panel-border: rgba(124, 196, 224, 0.18);
+    --danger: #ff8a8a;
+  }
+
+  body {
+    background: radial-gradient(circle at 15% 20%, #14342f, transparent 34%),
+      radial-gradient(circle at 90% 12%, #2a2413, transparent 32%),
+      linear-gradient(130deg, #0d1117, var(--bg-0));
+  }
+
+  .composer textarea,
+  .identity-card,
+  .post-item {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink-0);
+  }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--accent-0);
   }
 }
