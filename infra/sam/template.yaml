@@ -45,11 +45,22 @@ Resources:
               issuer: !Ref Auth0Issuer
               audience:
                 - !Ref Auth0Audience
+        # Toda ruta exige token salvo que declare Authorizer: NONE de forma
+        # explicita. Ademas de ser la postura segura por defecto, SAM solo
+        # acepta el valor NONE por ruta cuando existe un DefaultAuthorizer:
+        # sin esta linea la plantilla no transforma y el despliegue falla.
+        DefaultAuthorizer: Auth0Authorizer
 
   PostsTable:
     Type: AWS::DynamoDB::Table
+    # La tabla guarda las publicaciones. Sin estas politicas, eliminar el stack
+    # o reemplazar la tabla borraria los datos sin aviso.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
