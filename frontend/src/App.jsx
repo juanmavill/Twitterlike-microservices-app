@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+
 import { createPost, getMyProfile, getStream } from './api';
+import { validateDraft } from './lib/post.js';
+import Composer from './components/Composer.jsx';
+import PostList from './components/PostList.jsx';
+import SessionCard from './components/SessionCard.jsx';
 
-const MAX_CHARS = 140;
 const logoutReturnTo = import.meta.env.VITE_AUTH0_LOGOUT_RETURN_TO || window.location.origin;
-
-function formatDate(isoDate) {
-  return new Intl.DateTimeFormat('es-CO', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(isoDate));
-}
+const audience = import.meta.env.VITE_AUTH0_AUDIENCE;
 
 export default function App() {
   const {
@@ -27,12 +25,10 @@ export default function App() {
   const [posts, setPosts] = useState([]);
 
   const [draft, setDraft] = useState('');
-  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  const [me, setMe] = useState(null);
-
-  const charsLeft = useMemo(() => MAX_CHARS - draft.length, [draft]);
+  const [profile, setProfile] = useState(null);
 
   const loadStream = useCallback(async () => {
     setStreamLoading(true);
@@ -47,24 +43,20 @@ export default function App() {
     }
   }, []);
 
-  const loadMe = useCallback(async () => {
+  // El perfil viene de una ruta protegida por el scope read:profile. Si el token
+  // no lo trae, se deja en null en vez de romper la vista.
+  const loadProfile = useCallback(async () => {
     if (!isAuthenticated) {
-      setMe(null);
+      setProfile(null);
       return;
     }
-
     try {
       const token = await getAccessTokenSilently({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-          scope: 'read:profile'
-        }
+        authorizationParams: { audience, scope: 'read:profile' }
       });
-
-      const profile = await getMyProfile(token);
-      setMe(profile);
+      setProfile(await getMyProfile(token));
     } catch {
-      setMe(null);
+      setProfile(null);
     }
   }, [getAccessTokenSilently, isAuthenticated]);
 
@@ -73,151 +65,95 @@ export default function App() {
   }, [loadStream]);
 
   useEffect(() => {
-    loadMe();
-  }, [loadMe]);
+    loadProfile();
+  }, [loadProfile]);
 
   async function handleCreatePost(event) {
     event.preventDefault();
 
-    if (!draft.trim()) {
-      setSubmitError('El mensaje no puede estar vacio.');
+    const { valid, error } = validateDraft(draft);
+    if (!valid) {
+      setSubmitError(error);
       return;
     }
 
-    if (draft.length > MAX_CHARS) {
-      setSubmitError('El mensaje supera 140 caracteres.');
-      return;
-    }
-
-    setSubmitLoading(true);
+    setSubmitting(true);
     setSubmitError('');
-
     try {
       const token = await getAccessTokenSilently({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-          scope: 'write:posts'
-        }
+        authorizationParams: { audience, scope: 'write:posts' }
       });
-
       await createPost(draft.trim(), token);
       setDraft('');
       await loadStream();
     } catch (error) {
       setSubmitError(error.message || 'No fue posible publicar el mensaje.');
     } finally {
-      setSubmitLoading(false);
+      setSubmitting(false);
     }
   }
 
   if (isLoading) {
-    return <div className="status-view">Cargando autenticacion...</div>;
+    return (
+      <div className="status-view" role="status" aria-live="polite">
+        Cargando autenticación…
+      </div>
+    );
   }
 
   return (
     <div className="page-shell">
-      <div className="ambient-shape shape-a" />
-      <div className="ambient-shape shape-b" />
+      <div className="ambient-shape shape-a" aria-hidden="true" />
+      <div className="ambient-shape shape-b" aria-hidden="true" />
 
       <main className="app-grid">
-        <section className="panel panel-brand">
-          <p className="eyebrow">Experimental Assignment</p>
-          <h1>PulseFeed</h1>
+        <section className="panel panel-brand" aria-labelledby="brand-title">
+          <p className="eyebrow">Stream público · Auth0 · AWS</p>
+          <h1 id="brand-title">PulseFeed</h1>
           <p className="lead">
-            Stream publico global con backend seguro por Auth0. Publica mensajes de maximo 140 caracteres.
+            Stream público global con backend protegido por Auth0. Las publicaciones son de
+            máximo 140 caracteres y crear una exige el scope <code>write:posts</code>.
           </p>
 
           <div className="auth-actions">
             {!isAuthenticated ? (
               <button className="btn btn-primary" onClick={() => loginWithRedirect()}>
-                Iniciar sesion
+                Iniciar sesión
               </button>
             ) : (
               <button
                 className="btn btn-secondary"
-                onClick={() =>
-                    logout({
-                    logoutParams: { returnTo: logoutReturnTo }
-                  })
-                }
+                onClick={() => logout({ logoutParams: { returnTo: logoutReturnTo } })}
               >
-                Cerrar sesion
+                Cerrar sesión
               </button>
             )}
           </div>
 
-          <div className="identity-card">
-            <h2>Sesion</h2>
-            {!isAuthenticated ? (
-              <p>No autenticado</p>
-            ) : (
-              <>
-                <p>
-                  <strong>Usuario:</strong> {user?.name || user?.email}
-                </p>
-                <p>
-                  <strong>ID Auth0:</strong> {me?.auth0UserId || 'cargando...'}
-                </p>
-                <p>
-                  <strong>Correo:</strong> {me?.email || user?.email || 'sin dato'}
-                </p>
-              </>
-            )}
-          </div>
+          <SessionCard isAuthenticated={isAuthenticated} user={user} profile={profile} />
         </section>
 
-        <section className="panel panel-feed">
+        <section className="panel panel-feed" aria-labelledby="feed-title">
           <header className="feed-header">
-            <h2>Global Stream</h2>
-            <button className="btn btn-ghost" onClick={loadStream}>
-              Recargar
+            <h2 id="feed-title">Stream global</h2>
+            <button className="btn btn-ghost" onClick={loadStream} disabled={streamLoading}>
+              {streamLoading ? 'Cargando…' : 'Recargar'}
             </button>
           </header>
 
           {isAuthenticated ? (
-            <form className="composer" onSubmit={handleCreatePost}>
-              <label htmlFor="post-content">Nuevo post</label>
-              <textarea
-                id="post-content"
-                value={draft}
-                maxLength={MAX_CHARS}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="Escribe algo corto, claro y valioso..."
-              />
-
-              <div className="composer-footer">
-                <span className={charsLeft < 15 ? 'counter counter-warning' : 'counter'}>
-                  {charsLeft} caracteres restantes
-                </span>
-                <button className="btn btn-primary" disabled={submitLoading} type="submit">
-                  {submitLoading ? 'Publicando...' : 'Publicar'}
-                </button>
-              </div>
-              {submitError && <p className="error-text">{submitError}</p>}
-            </form>
+            <Composer
+              draft={draft}
+              onDraftChange={setDraft}
+              onSubmit={handleCreatePost}
+              submitting={submitting}
+              error={submitError}
+            />
           ) : (
-            <p className="notice-text">Inicia sesion para crear posts.</p>
+            <p className="notice-text">Inicia sesión para publicar.</p>
           )}
 
-          {streamLoading ? (
-            <div className="status-view">Cargando stream...</div>
-          ) : streamError ? (
-            <p className="error-text">{streamError}</p>
-          ) : posts.length === 0 ? (
-            <p className="notice-text">No hay posts aun. Se el primero en publicar.</p>
-          ) : (
-            <ul className="post-list">
-              {posts.map((post) => (
-                <li className="post-item" key={post.id}>
-                  <div className="post-meta">
-                    <strong>{post.authorName}</strong>
-                    <span>{formatDate(post.createdAt)}</span>
-                  </div>
-                  <p>{post.content}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <PostList posts={posts} loading={streamLoading} error={streamError} />
         </section>
       </main>
     </div>
